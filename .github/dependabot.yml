@@ -1,0 +1,11 @@
+# Watches package.json. The browser libraries listed there are loaded from
+# CDNs, not node_modules -- when Dependabot bumps one, update the matching
+# URL in index.html and service-worker.js, regenerate its SRI hash, and bump
+# CACHE_NAME in service-worker.js, all in the same commit.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
