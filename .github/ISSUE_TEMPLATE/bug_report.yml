@@ -1,0 +1,46 @@
+name: Report a bug
+description: Something in SlideForge broke or behaves oddly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping. **Please don't paste private slide text.** If the bug needs content to reproduce, shrink it to a few harmless lines.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Say what you did and what you saw instead of what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open SlideForge
+        2. Paste ...
+        3. Click Export PDF
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: SlideForge version
+      description: Filled in for you when you came from the app. Find it in More, About.
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Browser and device
+      description: Filled in for you when you came from the app.
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots are welcome. Console errors help too (press F12, then Console).
+    validations:
+      required: false

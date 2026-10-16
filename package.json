@@ -1,32 +1,45 @@
 {
   "name": "slideforge",
-  "version": "1.1.0",
+  "version": "1.3.0",
   "private": true,
-  "description": "A lightweight, browser-based markdown-to-presentation editor with live preview, PDF export, Mermaid diagrams, and offline PWA support. No build step required.",
+  "description": "Write Markdown, get slides. Live preview, Present mode, PDF export, Mermaid diagrams, and offline PWA support. No build step required.",
   "main": "index.html",
   "scripts": {
     "start": "npx serve .",
-    "dev": "npx live-server --port=5500"
+    "dev": "npx live-server --port=5500",
+    "check": "node scripts/check.mjs",
+    "test:smoke": "node tests/smoke.cjs",
+    "test": "node scripts/check.mjs && node tests/smoke.cjs",
+    "update-deps": "node scripts/update-deps.mjs --apply"
   },
-  "keywords": ["markdown", "presentation", "slides", "pdf-export", "mermaid", "pwa", "editor", "vanilla-js"],
+  "keywords": [
+    "markdown",
+    "presentation",
+    "slides",
+    "pdf-export",
+    "mermaid",
+    "pwa",
+    "editor",
+    "vanilla-js"
+  ],
   "author": "Guy-Bernard Estriplet II (RaMindz)",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/RaMindz/slideforge.git"
+    "url": "https://github.com/UniverSoulSun/slideforge.git"
   },
-  "homepage": "https://github.com/RaMindz/slideforge#readme",
+  "homepage": "https://slideforge-chi.vercel.app",
   "bugs": {
-    "url": "https://github.com/RaMindz/slideforge/issues"
+    "url": "https://github.com/UniverSoulSun/slideforge/issues"
   },
   "devDependencies": {
-    "@fortawesome/fontawesome-free": "6.5.1",
     "dompurify": "3.4.15",
     "html2canvas-pro": "2.4.4",
     "jspdf": "4.2.1",
     "live-server": "1.2.2",
     "marked": "18.0.14",
     "mermaid": "11.17.2",
+    "playwright": "1.64.1",
     "serve": "14.2.6"
   }
 }

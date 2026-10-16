@@ -1,0 +1,131 @@
+name: Update libraries
+
+# Every Monday: look for newer versions of the browser libraries that
+# index.html loads from the CDN. Patch and minor releases are applied, tested,
+# and offered as a pull request. Anything risky becomes an issue labelled
+# "manual-action", which GitHub emails to you.
+#
+# Run it any time from the Actions tab (Run workflow), for example after a
+# security alert.
+
+on:
+  schedule:
+    - cron: '17 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency: update-libraries
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Look for newer versions and apply patch and minor updates
+        id: update
+        run: node scripts/update-deps.mjs --apply --report "$RUNNER_TEMP/report.md"
+
+      - name: Show the report on the run page
+        if: always()
+        run: |
+          echo "## Library check" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Install browser test tools
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund "playwright@$(node -p "require('./package.json').devDependencies.playwright")"
+          npx playwright install --with-deps chromium
+
+      - name: Test the updated files
+        id: verify
+        if: steps.update.outputs.changed == 'true'
+        continue-on-error: true
+        run: |
+          node scripts/check.mjs
+          bash scripts/verify-sri.sh
+          node tests/smoke.cjs
+
+      - name: Open a pull request
+        if: steps.update.outputs.changed == 'true' && steps.verify.outcome == 'success'
+        env:
+          BRANCH: ${{ steps.update.outputs.branch }}
+          TITLE: ${{ steps.update.outputs.title }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists, so this update was already proposed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add -- index.html service-worker.js package.json README.md
+          git commit -m "$TITLE"
+          git push origin "$BRANCH"
+
+          {
+            cat "$RUNNER_TEMP/report.md"
+            echo
+            echo "Already passed in this workflow: consistency checks, SRI hashes against the CDN, and a real-browser smoke test (page load, diagram, present mode, PDF export, feedback dialog, analytics promises)."
+            echo
+            echo "The Vercel preview on this pull request is the last look. If it works, merge: Vercel then deploys to production."
+          } > "$RUNNER_TEMP/pr-body.md"
+
+          if ! gh pr create --base "$BASE" --head "$BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"; then
+            gh label create manual-action --color D93F0B --description "Needs a human" --force
+            gh issue create --label manual-action \
+              --title "Open the pull request for $BRANCH" \
+              --body "The library update passed its checks and is pushed as branch \`$BRANCH\`, but GitHub would not let the workflow open the pull request. Fix: Settings > Actions > General > Workflow permissions > tick 'Allow GitHub Actions to create and approve pull requests'. Then open a pull request from that branch. Run: $RUN_URL"
+          fi
+
+      - name: Report an update that failed its checks
+        if: steps.update.outputs.changed == 'true' && steps.verify.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          gh label create manual-action --color D93F0B --description "Needs a human" --force
+          title="Library update failed its checks"
+          if gh issue list --state open --label manual-action --limit 100 --json title --jq '.[].title' | grep -Fxq "$title"; then
+            echo "An issue about this is already open."
+            exit 0
+          fi
+          {
+            echo "The weekly check found newer libraries, applied them, and the tests failed, so nothing was proposed. Your site is unchanged."
+            echo
+            cat "$RUNNER_TEMP/report.md"
+            echo
+            echo "See which test failed: $RUN_URL"
+            echo
+            echo "What to do: open the run, read the failing step, and either fix the app for the new version or hold that library back."
+          } > "$RUNNER_TEMP/failed.md"
+          gh issue create --label manual-action --title "$title" --body-file "$RUNNER_TEMP/failed.md"
+
+      - name: Ask for a decision on major or deprecated releases
+        if: steps.update.outputs.manual == 'true'
+        env:
+          TITLE: ${{ steps.update.outputs.manual_title }}
+        run: |
+          set -euo pipefail
+          gh label create manual-action --color D93F0B --description "Needs a human" --force
+          if gh issue list --state open --label manual-action --limit 100 --json title --jq '.[].title' | grep -Fxq "$TITLE"; then
+            echo "An issue about this is already open."
+            exit 0
+          fi
+          {
+            echo "These releases are not applied automatically because they may break SlideForge."
+            echo
+            cat "$RUNNER_TEMP/report.md"
+            echo
+            echo "To try one by hand: \`node scripts/update-deps.mjs --apply --allow-major --only <library>\`, then \`npm test\`. Full steps are in MAINTAINING.md."
+          } > "$RUNNER_TEMP/manual.md"
+          gh issue create --label manual-action --title "$TITLE" --body-file "$RUNNER_TEMP/manual.md"

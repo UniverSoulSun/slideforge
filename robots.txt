@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://slideforge-chi.vercel.app/sitemap.xml

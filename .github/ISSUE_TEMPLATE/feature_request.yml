@@ -1,0 +1,46 @@
+name: Suggest an idea
+description: Tell us what would make SlideForge more useful for you.
+labels: ["idea"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the job, not the feature. For example, "present a talk from my phone".
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: A rough idea is fine.
+    validations:
+      required: false
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who are you?
+      description: Helps us see who uses SlideForge. Optional.
+      options:
+        - Developer or engineer
+        - Teacher or trainer
+        - Student
+        - Writer or consultant
+        - Founder or marketer
+        - Something else
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: SlideForge version
+      description: Filled in for you when you came from the app.
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Browser and device
+      description: Filled in for you when you came from the app.
+    validations:
+      required: false

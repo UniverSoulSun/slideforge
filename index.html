@@ -2,81 +2,193 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Markdown-to-presentation editor with live preview, PDF export, and native print. Runs entirely in the browser.">
-    <title>SlideForge</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="description" content="Write Markdown, get slides. Live preview, full-screen Present mode, PDF export and offline support. Free and open source; runs entirely in your browser.">
+    <meta name="color-scheme" content="light dark">
+    <title>SlideForge: Markdown to slides, in your browser</title>
+    <link rel="canonical" href="https://slideforge-chi.vercel.app/">
+
+    <!-- Link previews (Reddit, LinkedIn, X, Slack, iMessage) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SlideForge">
+    <meta property="og:title" content="SlideForge: Markdown in, slides out">
+    <meta property="og:description" content="Write Markdown, get slides. Present full screen, export a PDF, work offline. Free, open source, and everything stays in your browser.">
+    <meta property="og:url" content="https://slideforge-chi.vercel.app/">
+    <meta property="og:image" content="https://slideforge-chi.vercel.app/icons/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="A Markdown outline on the right of a white slide, with the words Markdown in, slides out.">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <!-- Structured data for search engines (not executable, so the CSP leaves it alone) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "SlideForge",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Any modern browser",
+      "description": "Write Markdown, get slides. Present full screen, export a PDF, work offline. Free and open source.",
+      "url": "https://slideforge-chi.vercel.app/",
+      "license": "https://opensource.org/license/mit",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+    </script>
 
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#4299e1">
+    <meta name="theme-color" content="#E4E8EE" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#121923" media="(prefers-color-scheme: dark)">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="SlideForge">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <!-- Self-hosted fonts (SIL OFL, see fonts/LICENSES.txt): no third-party font requests. -->
+    <link rel="preload" as="font" type="font/woff2" href="fonts/bricolage-grotesque-latin-wght-normal.woff2" crossorigin>
+    <link rel="preload" as="font" type="font/woff2" href="fonts/source-serif-4-latin-wght-normal.woff2" crossorigin>
 
     <!--
       External dependencies. Versions are pinned exactly and mirrored in
       package.json devDependencies so Dependabot can flag CVEs. Every tag
       carries a Subresource Integrity hash; when a version changes, the hash
       must be regenerated from that exact file or the browser blocks it.
+      Run scripts/verify-sri.sh to re-check them against the CDN.
     -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.15/dist/purify.min.js" integrity="sha384-uUMu9JDY09vBzRf9SPcK2VgUj+W/70J6Soc+Dded5P474ElQ63iv9j5N3DE7Kp3N" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@18.0.14/lib/marked.umd.js" integrity="sha384-2vpGtuKqJvFlwJqYnf/wUMuzUfhUnYBt9oay0e2yaFcq0Dh6/aEbQ8YAOeKGzlYo" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js" integrity="sha384-qovJwSBbRDPP5cEjCp8S0UP66wrvnjaa60XMOGzTNanrThcrGfXfnZkvgY8N1KT3" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas-pro@2.4.4/dist/html2canvas-pro.min.js" integrity="sha384-p1jiYALFnUMa2gZZSne9+5HrPM/5ByRopgI0w/sKXu8PNCSFPaaZpZyq+mXGToaD" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js" integrity="sha384-EOXBFmc3gx5mb+vn0vPvvGqACToJD24hhacX5Yx+8NUUQrHIle/Qi5Bg9o3zKwW2" crossorigin="anonymous"></script>
+    <!--
+      Mermaid is 3.5 MB, so it loads only when a slide contains a mermaid block.
+      This inert tag is the single source of truth for its URL and hash: script.js
+      reads it, and verify-sri.sh checks it like any other tag.
+    -->
+    <script type="text/plain" id="mermaid-lazy" data-src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js" integrity="sha384-EOXBFmc3gx5mb+vn0vPvvGqACToJD24hhacX5Yx+8NUUQrHIle/Qi5Bg9o3zKwW2" crossorigin="anonymous"></script>
 
     <!-- Local Styles -->
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-    <div class="app-container">
-        <aside class="sidebar">
-            <div class="btn-group">
-                <button class="btn active" id="editBtn" title="Edit Markdown" aria-label="Edit Markdown">
-                    <i class="fas fa-edit" aria-hidden="true"></i>
-                </button>
-                <button class="btn" id="previewBtn" title="Preview Slides" aria-label="Preview Slides">
-                    <i class="fas fa-eye" aria-hidden="true"></i>
-                </button>
-            </div>
-        </aside>
+<body data-view="write">
+    <div class="app">
+        <header class="topbar">
+            <a class="brand" href="/" aria-label="SlideForge">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M7 10h6M7 14h9"/></svg>
+                </span>
+                <span class="brand-name">SlideForge</span>
+            </a>
 
-        <main class="main-content">
-            <header class="header">
-                <div class="logo">SlideForge</div>
-                <div class="header-actions">
-                    <button class="btn btn-secondary" id="importBtn">Import</button>
-                    <button class="btn btn-primary" id="exportPdfBtn">Export PDF</button>
-                    <button class="btn btn-secondary" id="shareBtn">Share</button>
-                    <button class="btn btn-secondary" id="printNativeBtn">Print</button>
-                    <button class="btn btn-secondary" id="saveBtn">Save</button>
-                </div>
-            </header>
+            <p class="doc-status" id="docStatus"><span id="slideCount">0 slides</span><span class="dot" aria-hidden="true"></span><span id="saveState">Autosaves as you type</span></p>
 
-            <div class="panels-container">
-                <div class="editor-panel">
-                    <div class="editor-header">Markdown Editor</div>
-                    <textarea id="markdownEditor" spellcheck="false" aria-label="Markdown source"></textarea>
-                </div>
-                <div class="preview-panel">
-                    <div class="preview-header">Slide Preview</div>
-                    <div id="previewContent" class="preview-content"></div>
+            <div class="actions">
+                <button class="btn btn-ghost" id="presentBtn" type="button" aria-label="Present">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+                    <span class="btn-label">Present</span>
+                </button>
+                <button class="btn btn-primary" id="exportPdfBtn" type="button">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+                    <span class="btn-label">Export PDF</span>
+                </button>
+                <div class="menu-wrap">
+                    <button class="btn btn-icon" id="moreBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" aria-label="More actions">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18.5" cy="12" r="1.2"/></svg>
+                    </button>
+                    <div class="menu" id="moreMenu" role="menu" aria-labelledby="moreBtn" hidden>
+                        <button class="menu-item" id="importBtn" type="button" role="menuitem">Import a file</button>
+                        <button class="menu-item" id="saveBtn" type="button" role="menuitem">Save a copy</button>
+                        <button class="menu-item" id="shareBtn" type="button" role="menuitem">Share the Markdown</button>
+                        <button class="menu-item" id="printNativeBtn" type="button" role="menuitem">Print</button>
+                        <div class="menu-sep" role="separator"></div>
+                        <button class="menu-item" id="feedbackBtn" type="button" role="menuitem">Send feedback</button>
+                        <button class="menu-item" id="aboutBtn" type="button" role="menuitem">About SlideForge</button>
+                    </div>
                 </div>
             </div>
+        </header>
+
+        <div id="banner" class="banner" role="region" aria-label="Notice" aria-live="polite" hidden>
+            <p class="banner-text" id="bannerText"></p>
+            <div class="banner-actions" id="bannerActions"></div>
+        </div>
+
+        <main class="workspace">
+            <section class="pane pane-editor" id="editorPanel" aria-label="Markdown editor">
+                <div class="snippets" role="toolbar" aria-label="Insert into your slides">
+                    <button class="chip" type="button" data-insert="slide">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New slide
+                    </button>
+                    <button class="chip" type="button" data-insert="heading">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5v14M6 12h12"/></svg>Heading
+                    </button>
+                    <button class="chip" type="button" data-insert="list">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6.5h10M10 12h10M10 17.5h10M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/></svg>List
+                    </button>
+                    <button class="chip" type="button" data-insert="table">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 10h17M3.5 15h17M9.5 4.5v15"/></svg>Table
+                    </button>
+                    <button class="chip" type="button" data-insert="diagram">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="6" height="6" rx="1.2"/><rect x="14.5" y="14.5" width="6" height="6" rx="1.2"/><path d="M9.5 6.5h3.5a2 2 0 0 1 2 2v6"/></svg>Diagram
+                    </button>
+                </div>
+                <textarea id="markdownEditor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Markdown source"></textarea>
+            </section>
+
+            <section class="pane pane-preview" id="previewPanel" aria-label="Slide preview">
+                <div id="previewContent" class="preview-content"></div>
+            </section>
         </main>
+
+        <nav class="tabbar" aria-label="View">
+            <button class="tab active" id="editBtn" type="button" aria-pressed="true">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></svg>
+                <span>Write</span>
+            </button>
+            <button class="tab" id="previewBtn" type="button" aria-pressed="false">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M8 20h8"/></svg>
+                <span>Slides</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Present mode -->
+    <div id="presenter" class="presenter" role="dialog" aria-modal="true" aria-label="Presentation" hidden>
+        <div class="presenter-stage" id="presenterStage"></div>
+        <div class="presenter-bar">
+            <button class="presenter-btn" id="presentPrev" type="button" aria-label="Previous slide">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6"/></svg>
+            </button>
+            <span class="presenter-count" id="presentCount" aria-live="polite">1 / 1</span>
+            <button class="presenter-btn" id="presentNext" type="button" aria-label="Next slide">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg>
+            </button>
+            <button class="presenter-btn" id="presentClose" type="button" aria-label="Exit presentation">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
+            </button>
+        </div>
     </div>
 
     <!-- Export PDF Modal -->
     <div id="exportModal" class="modal-overlay" style="display: none;">
         <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle">
-            <h3 id="exportModalTitle">Export as PDF</h3>
-            <p>Enter a file name for your PDF:</p>
-            <input type="text" id="fileNameInput" placeholder="e.g., my-presentation.pdf">
-            <div class="btn-group">
-                <button class="btn btn-primary" id="confirmExportBtn">Export</button>
-                <button class="btn btn-secondary" id="cancelExportBtn">Cancel</button>
+            <h2 id="exportModalTitle">Export as PDF</h2>
+            <p class="modal-hint">Each slide becomes one page.</p>
+            <fieldset class="save-options">
+                <legend class="visually-hidden">Page layout</legend>
+                <label>
+                    <input type="radio" name="pdfOrientation" value="landscape" checked>
+                    <span><strong>Landscape</strong>, best for slides</span>
+                </label>
+                <label>
+                    <input type="radio" name="pdfOrientation" value="portrait">
+                    <span><strong>Portrait</strong>, best for long text and tables</span>
+                </label>
+            </fieldset>
+            <label class="field" for="fileNameInput">File name</label>
+            <input type="text" id="fileNameInput" placeholder="presentation.pdf" autocomplete="off">
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="cancelExportBtn" type="button">Cancel</button>
+                <button class="btn btn-primary" id="confirmExportBtn" type="button">Export</button>
             </div>
         </div>
     </div>
@@ -84,25 +196,62 @@
     <!-- Save Modal -->
     <div id="saveModal" class="modal-overlay" style="display: none;">
         <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="saveModalTitle">
-            <h3 id="saveModalTitle">Save Options</h3>
-            <div class="save-options">
+            <h2 id="saveModalTitle">Save a copy</h2>
+            <fieldset class="save-options">
+                <legend class="visually-hidden">File format</legend>
                 <label>
                     <input type="radio" name="saveType" value="markdown" checked>
-                    <span>Save as Markdown (.md)</span>
+                    <span><strong>Markdown</strong> (.md), editable anywhere</span>
                 </label>
                 <label>
                     <input type="radio" name="saveType" value="text">
-                    <span>Save as Text (.txt)</span>
+                    <span><strong>Plain text</strong> (.txt), formatting removed</span>
                 </label>
                 <label>
                     <input type="radio" name="saveType" value="html">
-                    <span>Save as HTML (.html)</span>
+                    <span><strong>Web page</strong> (.html), opens in any browser</span>
                 </label>
+            </fieldset>
+            <label class="field" for="saveFileNameInput">File name</label>
+            <input type="text" id="saveFileNameInput" placeholder="presentation" autocomplete="off">
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="cancelSaveBtn" type="button">Cancel</button>
+                <button class="btn btn-primary" id="confirmSaveBtn" type="button">Save</button>
             </div>
-            <input type="text" id="saveFileNameInput" placeholder="e.g., my-presentation">
-            <div class="btn-group">
-                <button class="btn btn-primary" id="confirmSaveBtn">Save</button>
-                <button class="btn btn-secondary" id="cancelSaveBtn">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Feedback Modal -->
+    <div id="feedbackModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="feedbackModalTitle">
+            <h2 id="feedbackModalTitle">Send feedback</h2>
+            <p class="modal-hint">Found a bug or have an idea? Pick where to send it. Your slides are never attached.</p>
+            <div class="feedback-links">
+                <a class="btn btn-ghost" id="feedbackBug" href="#" target="_blank" rel="noopener noreferrer">Report a bug</a>
+                <a class="btn btn-ghost" id="feedbackIdea" href="#" target="_blank" rel="noopener noreferrer">Suggest an idea</a>
+                <a class="btn btn-ghost" id="feedbackMail" href="#" hidden>Email us</a>
+            </div>
+            <p class="modal-fine">GitHub needs a free account. The form arrives with your app version, browser and screen size filled in so we can reproduce the problem.</p>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="closeFeedbackBtn" type="button">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="aboutModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="aboutModalTitle">
+            <h2 id="aboutModalTitle">About SlideForge</h2>
+            <p>Write Markdown, get slides. Present them, export them as a PDF, or save them as a web page.</p>
+            <p><strong>Your text stays on your device.</strong> There is no account and no server. Drafts autosave in this browser only, and the app works offline once it has loaded.</p>
+            <p>Free and open source under the MIT license. Version <span id="appVersion">1.3.0</span>.</p>
+            <label class="check" id="analyticsRow" hidden>
+                <input type="checkbox" id="analyticsToggle">
+                <span><strong>Share anonymous usage counts.</strong> Page visits and which features get used, never your text or file names. No cookies. <a id="analyticsNote" href="https://github.com/UniverSoulSun/slideforge#privacy" target="_blank" rel="noopener noreferrer">How it works</a></span>
+            </label>
+            <div class="modal-actions">
+                <a class="btn btn-ghost" href="https://github.com/UniverSoulSun/slideforge" target="_blank" rel="noopener noreferrer">View the source</a>
+                <button class="btn btn-primary" id="closeAboutBtn" type="button">Close</button>
             </div>
         </div>
     </div>
@@ -113,6 +262,8 @@
     <div id="notification" class="notification" role="status" aria-live="polite"></div>
 
     <!-- Local JavaScript -->
+    <script src="config.js"></script>
+    <script src="analytics.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

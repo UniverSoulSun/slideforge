@@ -1,11 +1,25 @@
-# Watches package.json. The browser libraries listed there are loaded from
-# CDNs, not node_modules -- when Dependabot bumps one, update the matching
-# URL in index.html and service-worker.js, regenerate its SRI hash, and bump
-# CACHE_NAME in service-worker.js, all in the same commit.
+# Two jobs only. The five browser libraries in index.html are handled by
+# .github/workflows/update-deps.yml, because they load from a CDN and need
+# their SRI hash and service-worker entry updated in the same commit, which
+# Dependabot cannot do.
+#
+# If Dependabot opens a SECURITY pull request for one of those five libraries,
+# it only changes package.json. Close it and run "Update libraries" from the
+# Actions tab instead.
 version: 2
 updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "dompurify"
+      - dependency-name: "marked"
+      - dependency-name: "jspdf"
+      - dependency-name: "html2canvas-pro"
+      - dependency-name: "mermaid"

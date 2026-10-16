@@ -2,39 +2,78 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------- Element references ----------
     const markdownEditor = document.getElementById('markdownEditor');
     const previewContent = document.getElementById('previewContent');
+    const previewPanel = document.getElementById('previewPanel');
     const exportPdfBtn = document.getElementById('exportPdfBtn');
+    const presentBtn = document.getElementById('presentBtn');
     const shareBtn = document.getElementById('shareBtn');
     const printNativeBtn = document.getElementById('printNativeBtn');
     const saveBtn = document.getElementById('saveBtn');
     const importBtn = document.getElementById('importBtn');
+    const aboutBtn = document.getElementById('aboutBtn');
+    const moreBtn = document.getElementById('moreBtn');
+    const moreMenu = document.getElementById('moreMenu');
     const editBtn = document.getElementById('editBtn');
     const previewBtn = document.getElementById('previewBtn');
-    const editorPanel = document.querySelector('.editor-panel');
-    const previewPanel = document.querySelector('.preview-panel');
     const exportModal = document.getElementById('exportModal');
     const saveModal = document.getElementById('saveModal');
+    const aboutModal = document.getElementById('aboutModal');
     const fileNameInput = document.getElementById('fileNameInput');
     const saveFileNameInput = document.getElementById('saveFileNameInput');
     const confirmExportBtn = document.getElementById('confirmExportBtn');
     const cancelExportBtn = document.getElementById('cancelExportBtn');
     const confirmSaveBtn = document.getElementById('confirmSaveBtn');
     const cancelSaveBtn = document.getElementById('cancelSaveBtn');
+    const closeAboutBtn = document.getElementById('closeAboutBtn');
+    const feedbackBtn = document.getElementById('feedbackBtn');
+    const feedbackModal = document.getElementById('feedbackModal');
+    const closeFeedbackBtn = document.getElementById('closeFeedbackBtn');
+    const feedbackBug = document.getElementById('feedbackBug');
+    const feedbackIdea = document.getElementById('feedbackIdea');
+    const feedbackMail = document.getElementById('feedbackMail');
+    const appVersionEl = document.getElementById('appVersion');
+    const analyticsRow = document.getElementById('analyticsRow');
+    const analyticsToggle = document.getElementById('analyticsToggle');
     const fileInput = document.getElementById('fileInput');
     const notification = document.getElementById('notification');
+    const banner = document.getElementById('banner');
+    const bannerText = document.getElementById('bannerText');
+    const bannerActions = document.getElementById('bannerActions');
+    const slideCountEl = document.getElementById('slideCount');
+    const saveStateEl = document.getElementById('saveState');
+    const presenter = document.getElementById('presenter');
+    const presenterStage = document.getElementById('presenterStage');
+    const presentCount = document.getElementById('presentCount');
+    const presentPrev = document.getElementById('presentPrev');
+    const presentNext = document.getElementById('presentNext');
+    const presentClose = document.getElementById('presentClose');
+
+    // ---------- Settings and anonymous usage counts ----------
+    const CONFIG = window.SLIDEFORGE_CONFIG || { version: '', repo: '', feedbackEmail: '' };
+    const analytics = window.SlideForgeAnalytics;
+
+    // Event names are fixed strings; nothing the person typed is ever passed in.
+    function track(name) {
+        try {
+            if (analytics) analytics.track(name);
+        } catch {
+            // Counting must never get in the way.
+        }
+    }
+
+    let editTracked = false;
 
     // ---------- Sample content ----------
     const SAMPLE_CONTENT = `# Welcome to SlideForge!
 
-## Your Interactive Markdown Editor
+## Write Markdown, get slides
 
-This is a **Markdown** editor. You can type Markdown here and see the preview on the right.
+Type on the left and your slides appear on the right. On a phone, switch between **Write** and **Slides** with the tabs below.
 
 ### Key Features:
-* Real-time Markdown to HTML conversion
-* Export your content as a PDF
-* Share content with others
-* Use your device's native print function
-* Save in multiple formats
+* Live preview as you type
+* Present full screen, with arrow keys or swipes
+* Export a PDF, save a web page, or print
+* Works offline and autosaves on your device
 
 \`\`\`javascript
 function helloWorld() {
@@ -49,7 +88,7 @@ helloWorld();
 
 # About Your Presentation
 
-This is a new slide. Use three hyphens (\`---\`) on a new line to create a new slide.
+This is a new slide. Use three hyphens (\`---\`) on a new line to start one, or tap **New slide** above the editor.
 
 * **List Item 1**: Use asterisks or hyphens for bullet points
 * **List Item 2**: You can nest lists too
@@ -93,11 +132,47 @@ Enjoy creating your presentations!
     function showNotification(message, isError = false) {
         clearTimeout(notificationTimeout);
         notification.textContent = message;
-        notification.style.backgroundColor = isError ? '#e53e3e' : '#48bb78';
-        notification.style.display = 'block';
+        notification.classList.toggle('is-error', isError);
+        notification.classList.add('is-visible');
         notificationTimeout = setTimeout(() => {
-            notification.style.display = 'none';
-        }, 3000);
+            notification.classList.remove('is-visible');
+        }, isError ? 5000 : 3000);
+    }
+
+    // ---------- Banner (replaces blocking confirm() prompts) ----------
+    function hideBanner() {
+        banner.hidden = true;
+        bannerText.textContent = '';
+        bannerActions.replaceChildren();
+    }
+
+    function showBanner(text, actions) {
+        bannerText.textContent = text;
+        bannerActions.replaceChildren(...actions.map((action) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `btn ${action.primary ? 'btn-primary' : 'btn-ghost'}`;
+            button.textContent = action.label;
+            button.addEventListener('click', action.onClick);
+            return button;
+        }));
+        banner.hidden = false;
+    }
+
+    // ---------- Status line (slide count + autosave state) ----------
+    function updateSlideCount() {
+        const count = previewContent.querySelectorAll('.slide').length;
+        slideCountEl.textContent = `${count} ${count === 1 ? 'slide' : 'slides'}`;
+    }
+
+    const SAVE_STATES = {
+        idle: 'Autosaves as you type',
+        pending: 'Saving…',
+        saved: 'Saved on this device',
+        unavailable: 'Autosave unavailable here'
+    };
+    function setSaveState(state) {
+        saveStateEl.textContent = SAVE_STATES[state] || SAVE_STATES.idle;
     }
 
     // ---------- Local autosave (device storage) ----------
@@ -122,16 +197,20 @@ Enjoy creating your presentations!
         try {
             if (!value.trim() || value === SAMPLE_CONTENT) {
                 localStorage.removeItem(DRAFT_KEY);
+                setSaveState('idle');
             } else {
                 localStorage.setItem(DRAFT_KEY, value);
+                setSaveState('saved');
             }
         } catch (error) {
             console.warn('Draft autosave unavailable:', error);
+            setSaveState('unavailable');
         }
     }
 
     function scheduleDraftSave() {
         clearTimeout(autosaveTimer);
+        setSaveState('pending');
         autosaveTimer = setTimeout(saveDraftNow, AUTOSAVE_DELAY_MS);
     }
 
@@ -167,27 +246,62 @@ Enjoy creating your presentations!
     }
 
     // ---------- Initial content: shared text > saved draft > sample ----------
+    // Nothing here blocks the page. Choices are offered in a banner, and a
+    // saved draft is never overwritten until the person edits.
     function chooseInitialContent() {
         const shared = readSharedContent();
         const draft = readDraft();
         const hasDraft = Boolean(draft && draft.trim() && draft !== SAMPLE_CONTENT);
 
         if (shared) {
+            track('open-from-share');
             if (hasDraft && draft !== shared) {
-                const append = window.confirm(
-                    'Add the shared text to the end of your saved draft?\n\n' +
-                    'OK: append it as a new slide.\n' +
-                    'Cancel: open the shared text on its own (your draft is replaced once you edit).'
-                );
-                return append ? `${draft}\n\n---\n\n${shared}` : shared;
+                showBanner('Opened the text you shared. You also have a saved draft.', [
+                    {
+                        label: 'Add to my draft',
+                        primary: true,
+                        onClick: () => {
+                            setEditorValue(`${draft}\n\n---\n\n${shared}`);
+                            scheduleDraftSave();
+                            hideBanner();
+                        }
+                    },
+                    {
+                        label: 'Open my draft',
+                        onClick: () => {
+                            setEditorValue(draft);
+                            hideBanner();
+                        }
+                    }
+                ]);
             }
             return shared;
         }
 
-        if (hasDraft && window.confirm('Restore your last unsaved draft?')) {
+        if (hasDraft) {
+            showBanner('Picked up where you left off.', [
+                { label: 'Start over with the sample', onClick: () => startOverWithSample(draft) }
+            ]);
             return draft;
         }
         return SAMPLE_CONTENT;
+    }
+
+    function startOverWithSample(previousDraft) {
+        setEditorValue(SAMPLE_CONTENT);
+        saveDraftNow(); // the sample is never stored as a draft
+        showBanner('Replaced your draft with the sample.', [
+            {
+                label: 'Undo',
+                primary: true,
+                onClick: () => {
+                    setEditorValue(previousDraft);
+                    saveDraftNow();
+                    hideBanner();
+                }
+            },
+            { label: 'Dismiss', onClick: hideBanner }
+        ]);
     }
 
     // ---------- Library checks ----------
@@ -195,7 +309,7 @@ Enjoy creating your presentations!
         if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
             // Fail closed: never render unsanitized markdown.
             console.error('marked.js or DOMPurify not loaded');
-            showNotification('Markdown libraries not loaded. Please refresh the page.', true);
+            showNotification('Markdown libraries did not load. Check your connection and refresh.', true);
             return false;
         }
         return true;
@@ -234,39 +348,128 @@ Enjoy creating your presentations!
         });
     }
 
-    // ---------- Mermaid diagrams ----------
-    const mermaidAvailable = typeof window.mermaid !== 'undefined';
-    if (mermaidAvailable) {
-        window.mermaid.initialize({
-            startOnLoad: false,
-            securityLevel: 'strict', // mermaid sanitizes labels; no click handlers
-            theme: 'default',
-            suppressErrorRendering: true
+    // ---------- Mermaid diagrams (loaded only when a slide needs one) ----------
+    // The URL and SRI hash live in the inert #mermaid-lazy tag in index.html.
+    const MERMAID_TIMEOUT_MS = 20000;
+    const MERMAID_RETRY_MS = 30000;
+    let mermaidInstance = null;
+    let mermaidPromise = null;
+    let mermaidFailedAt = 0;
+    let mermaidFailureShown = false;
+
+    function initMermaid(mermaid) {
+        if (!mermaidInstance) {
+            mermaid.initialize({
+                startOnLoad: false,
+                securityLevel: 'strict', // mermaid sanitizes labels; no click handlers
+                suppressErrorRendering: true,
+                // Match the slide palette: lamp-tinted nodes, ink text, slate lines.
+                theme: 'base',
+                themeVariables: {
+                    fontFamily: '"Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif',
+                    fontSize: '15px',
+                    primaryColor: '#fff3d1',
+                    primaryBorderColor: '#e39a00',
+                    primaryTextColor: '#121a26',
+                    secondaryColor: '#e8eeff',
+                    secondaryBorderColor: '#2447d6',
+                    secondaryTextColor: '#121a26',
+                    tertiaryColor: '#f1f4f8',
+                    tertiaryBorderColor: '#cfd6e0',
+                    tertiaryTextColor: '#121a26',
+                    lineColor: '#596579',
+                    textColor: '#121a26',
+                    edgeLabelBackground: '#ffffff'
+                }
+            });
+            mermaidInstance = mermaid;
+        }
+        return mermaidInstance;
+    }
+
+    function loadMermaid() {
+        if (window.mermaid) return Promise.resolve(initMermaid(window.mermaid));
+        if (mermaidPromise) return mermaidPromise;
+
+        const source = document.getElementById('mermaid-lazy');
+        if (!source) return Promise.resolve(null);
+
+        // After a failure, wait before trying again so typing while offline
+        // does not start a new download attempt on every keystroke.
+        if (mermaidFailedAt && Date.now() - mermaidFailedAt < MERMAID_RETRY_MS) {
+            return Promise.resolve(null);
+        }
+
+        mermaidPromise = new Promise((resolve) => {
+            let settled = false;
+            const script = document.createElement('script');
+            const finish = (value) => {
+                if (settled) return;
+                settled = true;
+                if (value) {
+                    mermaidFailedAt = 0;
+                    mermaidFailureShown = false;
+                } else {
+                    mermaidFailedAt = Date.now();
+                    mermaidPromise = null;
+                    script.remove();
+                }
+                resolve(value);
+            };
+
+            script.src = source.dataset.src;
+            script.integrity = source.getAttribute('integrity');
+            script.crossOrigin = 'anonymous';
+            script.onload = () => finish(window.mermaid ? initMermaid(window.mermaid) : null);
+            script.onerror = () => finish(null);
+            document.head.appendChild(script);
+            setTimeout(() => finish(null), MERMAID_TIMEOUT_MS);
         });
+        return mermaidPromise;
     }
 
     let renderGeneration = 0;
+    let diagramTracked = false;
 
     async function renderDiagrams(generation) {
-        if (!mermaidAvailable) return;
+        const blocks = Array.from(previewContent.querySelectorAll('pre > code.language-mermaid'));
+        if (blocks.length === 0) return;
+
+        blocks.forEach((code) => { code.parentElement.dataset.state = 'loading'; });
+        const mermaid = await loadMermaid();
+
+        // A newer render replaced these nodes while we waited; leave it alone.
+        if (generation !== renderGeneration) return;
+
+        if (!mermaid) {
+            blocks.forEach((code) => { delete code.parentElement.dataset.state; });
+            if (!mermaidFailureShown) {
+                mermaidFailureShown = true;
+                showNotification('Diagrams could not load, so they show as code for now.', true);
+            }
+            return;
+        }
 
         const nodes = [];
-        previewContent.querySelectorAll('pre > code.language-mermaid').forEach((code) => {
+        blocks.forEach((code) => {
             const diagram = document.createElement('div');
             diagram.className = 'mermaid';
             diagram.textContent = code.textContent; // text only, never HTML
             code.parentElement.replaceWith(diagram);
             nodes.push(diagram);
         });
-        if (nodes.length === 0) return;
+
+        if (!diagramTracked) {
+            diagramTracked = true;
+            track('diagram');
+        }
 
         try {
-            await window.mermaid.run({ nodes, suppressErrors: true });
+            await mermaid.run({ nodes, suppressErrors: true });
         } catch (error) {
             console.warn('Mermaid render failed:', error);
         }
 
-        // A newer render replaced these nodes while we waited; leave it alone.
         if (generation !== renderGeneration) return;
 
         nodes.forEach((diagram) => {
@@ -284,6 +487,15 @@ Enjoy creating your presentations!
     let renderTimer = null;
     let lastRender = Promise.resolve();
 
+    function renderEmptyState() {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        const title = document.createElement('strong');
+        title.textContent = 'No slides yet';
+        empty.append(title, 'Write something in the editor, or tap New slide to begin.');
+        previewContent.replaceChildren(empty);
+    }
+
     function renderMarkdown() {
         clearTimeout(renderTimer);
         renderTimer = null;
@@ -291,12 +503,17 @@ Enjoy creating your presentations!
 
         const generation = ++renderGeneration;
         try {
-            previewContent.replaceChildren(...buildSlides(markdownEditor.value));
+            if (!markdownEditor.value.trim()) {
+                renderEmptyState();
+            } else {
+                previewContent.replaceChildren(...buildSlides(markdownEditor.value));
+            }
         } catch (error) {
             console.error('Markdown rendering error:', error);
-            showNotification('Error rendering markdown', true);
+            showNotification('Could not render this text. Check for unusual markup.', true);
             return lastRender;
         }
+        updateSlideCount();
         lastRender = renderDiagrams(generation);
         return lastRender;
     }
@@ -311,90 +528,342 @@ Enjoy creating your presentations!
         return renderTimer !== null ? renderMarkdown() : lastRender;
     }
 
-    // ---------- Panel display (mobile edit/preview toggle) ----------
-    const updatePanelDisplay = () => {
-        if (window.innerWidth <= 768) {
-            if (editBtn.classList.contains('active')) {
-                editorPanel.style.display = 'flex';
-                previewPanel.style.display = 'none';
-            } else {
-                editorPanel.style.display = 'none';
-                previewPanel.style.display = 'flex';
-            }
-        } else {
-            editorPanel.style.display = 'flex';
-            previewPanel.style.display = 'flex';
-            editorPanel.style.flex = '1';
-            previewPanel.style.flex = '1';
-        }
-        editorPanel.style.width = 'auto';
-        previewPanel.style.width = 'auto';
-    };
+    function setEditorValue(value) {
+        markdownEditor.value = value;
+        renderMarkdown();
+    }
+
+    // ---------- Write / Slides view (phones; both show side by side on desktop) ----------
+    function setView(view) {
+        document.body.dataset.view = view;
+        const writing = view === 'write';
+        editBtn.classList.toggle('active', writing);
+        previewBtn.classList.toggle('active', !writing);
+        editBtn.setAttribute('aria-pressed', String(writing));
+        previewBtn.setAttribute('aria-pressed', String(!writing));
+    }
+
+    editBtn.addEventListener('click', () => setView('write'));
+    previewBtn.addEventListener('click', () => setView('preview'));
 
     // ---------- Initial setup ----------
     markdownEditor.value = chooseInitialContent();
-    editBtn.classList.add('active');
-    updatePanelDisplay();
+    setView('write');
     renderMarkdown();
 
     markdownEditor.addEventListener('input', () => {
         scheduleRender();
         scheduleDraftSave();
+        if (!editTracked) {
+            editTracked = true;
+            track('edit'); // once per visit: tells us how many visitors actually write something
+        }
     });
 
-    editBtn.addEventListener('click', () => {
-        editBtn.classList.add('active');
-        previewBtn.classList.remove('active');
-        updatePanelDisplay();
+    // ---------- Insert shortcuts ----------
+    const SNIPPETS = {
+        slide: { text: '---\n\n# Slide title\n\n', select: 'Slide title' },
+        heading: { text: '## Heading\n\n', select: 'Heading' },
+        list: { text: '- First point\n- Second point\n- Third point\n', select: 'First point' },
+        table: { text: '| Column | Column |\n| :----- | :----- |\n| Cell | Cell |\n' },
+        diagram: { text: '```mermaid\nflowchart LR\n    A[Start] --> B[Finish]\n```\n' }
+    };
+
+    function insertSnippet(key) {
+        const snippet = SNIPPETS[key];
+        if (!snippet) return;
+
+        const start = markdownEditor.selectionStart;
+        const end = markdownEditor.selectionEnd;
+        const before = markdownEditor.value.slice(0, start);
+        const after = markdownEditor.value.slice(end);
+
+        // Each snippet is a block: keep a blank line before it, and never
+        // glue it to text that follows. A "---" straight under a line of
+        // text would turn that text into a heading instead of a new slide.
+        let prefix = '';
+        if (before.length) prefix = before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+        const suffix = after.length && !after.startsWith('\n') ? '\n' : '';
+
+        markdownEditor.setRangeText(prefix + snippet.text + suffix, start, end, 'end');
+        markdownEditor.focus();
+
+        if (snippet.select) {
+            const from = start + prefix.length + snippet.text.indexOf(snippet.select);
+            markdownEditor.setSelectionRange(from, from + snippet.select.length);
+        }
+        markdownEditor.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    document.querySelectorAll('[data-insert]').forEach((chip) => {
+        // Keep focus (and the on-screen keyboard) in the editor while tapping.
+        chip.addEventListener('mousedown', (event) => event.preventDefault());
+        chip.addEventListener('click', () => insertSnippet(chip.dataset.insert));
     });
 
-    previewBtn.addEventListener('click', () => {
-        previewBtn.classList.add('active');
-        editBtn.classList.remove('active');
-        updatePanelDisplay();
+    // ---------- More menu ----------
+    function closeMenu(returnFocus = false) {
+        if (moreMenu.hidden) return;
+        moreMenu.hidden = true;
+        moreBtn.setAttribute('aria-expanded', 'false');
+        if (returnFocus) moreBtn.focus();
+    }
+
+    function openMenu() {
+        moreMenu.hidden = false;
+        moreBtn.setAttribute('aria-expanded', 'true');
+        const first = moreMenu.querySelector('.menu-item');
+        if (first) first.focus();
+    }
+
+    moreBtn.addEventListener('click', () => (moreMenu.hidden ? openMenu() : closeMenu(true)));
+    moreMenu.addEventListener('click', () => closeMenu(false));
+    document.addEventListener('click', (event) => {
+        if (!moreMenu.hidden && !event.target.closest('.menu-wrap')) closeMenu(false);
+    });
+    moreMenu.addEventListener('keydown', (event) => {
+        const items = Array.from(moreMenu.querySelectorAll('.menu-item'));
+        const index = items.indexOf(document.activeElement);
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            items[(index + 1) % items.length].focus();
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            items[(index - 1 + items.length) % items.length].focus();
+        } else if (event.key === 'Tab') {
+            closeMenu(false);
+        }
     });
 
-    window.addEventListener('resize', updatePanelDisplay);
+    // ---------- Modals ----------
+    const modals = [exportModal, saveModal, aboutModal, feedbackModal];
+    let modalOpener = null;
+
+    function focusableIn(container) {
+        return Array.from(container.querySelectorAll(
+            'button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+        )).filter((el) => el.offsetParent !== null || el === document.activeElement);
+    }
+
+    function openModal(modal, focusTarget) {
+        modalOpener = document.activeElement;
+        modal.style.display = 'flex';
+        (focusTarget || focusableIn(modal)[0] || modal).focus();
+    }
+
+    function closeModal(modal) {
+        modal.style.display = 'none';
+        const usable = modalOpener && document.contains(modalOpener) && modalOpener.offsetParent !== null;
+        (usable ? modalOpener : moreBtn).focus();
+        modalOpener = null;
+    }
+
+    modals.forEach((modal) => {
+        modal.addEventListener('mousedown', (event) => {
+            if (event.target === modal) closeModal(modal);
+        });
+    });
+
+    // Keep Tab inside whichever dialog is open.
+    function trapTab(event, container) {
+        const items = focusableIn(container);
+        if (items.length === 0) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
+
+    // ---------- Present mode ----------
+    let presentSlides = [];
+    let presentIndex = 0;
+    let presentOpener = null;
+    const isPresenting = () => !presenter.hidden;
+
+    function fitPresentedSlide() {
+        const slide = presenterStage.firstElementChild;
+        if (!slide || !slide.offsetWidth || !slide.offsetHeight) return;
+        const scale = Math.min(
+            (window.innerWidth * 0.95) / slide.offsetWidth,
+            (window.innerHeight * 0.88) / slide.offsetHeight
+        );
+        slide.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    }
+
+    function showPresentedSlide(index) {
+        presentIndex = Math.max(0, Math.min(presentSlides.length - 1, index));
+        presenterStage.replaceChildren(presentSlides[presentIndex]);
+        presentCount.textContent = `${presentIndex + 1} / ${presentSlides.length}`;
+        presentPrev.disabled = presentIndex === 0;
+        presentNext.disabled = presentIndex === presentSlides.length - 1;
+        fitPresentedSlide();
+    }
+
+    // Start from the slide currently at the top of the preview, if it is on screen.
+    function firstVisibleSlideIndex(slides) {
+        if (getComputedStyle(previewPanel).visibility === 'hidden') return 0;
+        const top = previewContent.getBoundingClientRect().top;
+        const index = slides.findIndex((slide) => slide.getBoundingClientRect().bottom > top + 40);
+        return index === -1 ? 0 : index;
+    }
+
+    async function openPresenter() {
+        await flushRender();
+        const slides = Array.from(previewContent.querySelectorAll('.slide'));
+        if (slides.length === 0) {
+            showNotification('Add a slide first, then present.', true);
+            return;
+        }
+        presentOpener = document.activeElement;
+        presentSlides = slides.map((slide) => slide.cloneNode(true));
+        presenter.hidden = false;
+        showPresentedSlide(firstVisibleSlideIndex(slides));
+        presentClose.focus();
+        track('present');
+
+        if (presenter.requestFullscreen) {
+            presenter.requestFullscreen().catch(() => {}); // optional; fine without it
+        }
+    }
+
+    function closePresenter() {
+        if (!isPresenting()) return;
+        presenter.hidden = true;
+        presenterStage.replaceChildren();
+        presentSlides = [];
+        if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+        }
+        const usable = presentOpener && document.contains(presentOpener) && presentOpener.offsetParent !== null;
+        (usable ? presentOpener : presentBtn).focus();
+        presentOpener = null;
+    }
+
+    presentBtn.addEventListener('click', openPresenter);
+    presentPrev.addEventListener('click', (event) => { event.stopPropagation(); showPresentedSlide(presentIndex - 1); });
+    presentNext.addEventListener('click', (event) => { event.stopPropagation(); showPresentedSlide(presentIndex + 1); });
+    presentClose.addEventListener('click', (event) => { event.stopPropagation(); closePresenter(); });
+
+    // Tap the left third to go back, anywhere else to go forward.
+    presenterStage.addEventListener('click', (event) => {
+        showPresentedSlide(presentIndex + (event.clientX < window.innerWidth / 3 ? -1 : 1));
+    });
+
+    let swipeStartX = null;
+    presenter.addEventListener('touchstart', (event) => {
+        swipeStartX = event.touches.length === 1 ? event.touches[0].clientX : null;
+    }, { passive: true });
+    presenter.addEventListener('touchend', (event) => {
+        if (swipeStartX === null) return;
+        const delta = event.changedTouches[0].clientX - swipeStartX;
+        swipeStartX = null;
+        if (Math.abs(delta) > 50) {
+            event.preventDefault(); // swipe handled; skip the synthetic tap
+            showPresentedSlide(presentIndex + (delta < 0 ? 1 : -1));
+        }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement) closePresenter();
+    });
+    window.addEventListener('resize', () => { if (isPresenting()) fitPresentedSlide(); });
+
+    // ---------- Keyboard ----------
+    document.addEventListener('keydown', (event) => {
+        if (isPresenting()) {
+            const keys = {
+                ArrowRight: 1, ArrowDown: 1, PageDown: 1, ' ': 1, Enter: 1,
+                ArrowLeft: -1, ArrowUp: -1, PageUp: -1, Backspace: -1
+            };
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closePresenter();
+            } else if (event.key === 'Home') {
+                event.preventDefault();
+                showPresentedSlide(0);
+            } else if (event.key === 'End') {
+                event.preventDefault();
+                showPresentedSlide(presentSlides.length - 1);
+            } else if (event.key in keys && !((event.key === ' ' || event.key === 'Enter') && event.target.tagName === 'BUTTON')) {
+                event.preventDefault();
+                showPresentedSlide(presentIndex + keys[event.key]);
+            } else if (event.key === 'Tab') {
+                trapTab(event, presenter);
+            }
+            return;
+        }
+
+        const openModalEl = modals.find((modal) => modal.style.display === 'flex');
+        if (openModalEl) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeModal(openModalEl);
+            } else if (event.key === 'Tab') {
+                trapTab(event, openModalEl);
+            } else if (event.key === 'Enter' && event.target.matches('input[type="text"]')) {
+                event.preventDefault();
+                (openModalEl === exportModal ? confirmExportBtn : confirmSaveBtn).click();
+            }
+            return;
+        }
+
+        if (event.key === 'Escape' && !moreMenu.hidden) closeMenu(true);
+    });
 
     // ---------- PDF export (jsPDF + html2canvas-pro, one slide per page) ----------
+    const ORIENTATION_KEY = 'slideforge-pdf-orientation';
+
+    function readOrientation() {
+        try {
+            return localStorage.getItem(ORIENTATION_KEY) === 'portrait' ? 'portrait' : 'landscape';
+        } catch {
+            return 'landscape';
+        }
+    }
+
     exportPdfBtn.addEventListener('click', () => {
-        exportModal.style.display = 'flex';
         fileNameInput.value = 'presentation.pdf';
-        fileNameInput.focus();
+        const radio = exportModal.querySelector(`input[name="pdfOrientation"][value="${readOrientation()}"]`);
+        if (radio) radio.checked = true;
+        openModal(exportModal, fileNameInput);
+        fileNameInput.select();
     });
 
-    cancelExportBtn.addEventListener('click', () => {
-        exportModal.style.display = 'none';
-    });
+    cancelExportBtn.addEventListener('click', () => closeModal(exportModal));
 
-    async function exportToPdf(fileName) {
+    async function exportToPdf(fileName, orientation) {
         const jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
         const renderToCanvas = typeof window.html2canvas === 'function'
             ? window.html2canvas
             : window.html2canvas && window.html2canvas.default;
 
         if (!jsPDFCtor || typeof renderToCanvas !== 'function') {
-            showNotification('PDF export libraries not loaded. Please refresh the page.', true);
+            showNotification('PDF tools did not load. Check your connection and refresh.', true);
             return;
         }
 
         confirmExportBtn.disabled = true;
-        confirmExportBtn.textContent = 'Exporting...';
-        showNotification('Generating PDF...');
+        confirmExportBtn.textContent = 'Exporting…';
+        showNotification('Building your PDF…');
 
         try {
             await flushRender();
 
             const slides = previewContent.querySelectorAll('.slide');
             if (slides.length === 0) {
-                showNotification('Nothing to export yet.', true);
+                showNotification('Add a slide first, then export.', true);
                 return;
             }
 
-            const pdf = new jsPDFCtor({ unit: 'in', format: 'letter', orientation: 'portrait' });
+            const pdf = new jsPDFCtor({ unit: 'in', format: 'letter', orientation });
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
-            const margin = 0.5;
+            const margin = orientation === 'landscape' ? 0.4 : 0.5;
             const usableWidth = pageWidth - margin * 2;
             const usableHeight = pageHeight - margin * 2;
 
@@ -418,15 +887,22 @@ Enjoy creating your presentations!
 
                 if (i > 0) pdf.addPage();
 
-                const xOffset = margin + (usableWidth - renderWidth) / 2;
-                pdf.addImage(imgData, 'JPEG', xOffset, margin, renderWidth, renderHeight);
+                const xOffset = (pageWidth - renderWidth) / 2;
+                const yOffset = orientation === 'landscape' ? (pageHeight - renderHeight) / 2 : margin;
+                pdf.addImage(imgData, 'JPEG', xOffset, yOffset, renderWidth, renderHeight);
+
+                // A hairline keeps the white slide readable against the white page.
+                pdf.setDrawColor(207, 214, 224);
+                pdf.setLineWidth(0.01);
+                pdf.rect(xOffset, yOffset, renderWidth, renderHeight);
             }
 
             pdf.save(fileName);
             showNotification('PDF exported successfully!');
+            track('export-pdf');
         } catch (error) {
             console.error('PDF export failed:', error);
-            showNotification('PDF export failed. Please try again.', true);
+            showNotification('PDF export failed. Try again, or use Print and save as PDF.', true);
         } finally {
             confirmExportBtn.disabled = false;
             confirmExportBtn.textContent = 'Export';
@@ -436,26 +912,34 @@ Enjoy creating your presentations!
     confirmExportBtn.addEventListener('click', () => {
         let fileName = fileNameInput.value.trim();
         if (!fileName) {
-            showNotification('Please enter a file name for the PDF.', true);
+            showNotification('Enter a file name for the PDF.', true);
             return;
         }
         if (!fileName.toLowerCase().endsWith('.pdf')) {
             fileName += '.pdf';
         }
-        exportModal.style.display = 'none';
-        exportToPdf(fileName);
+        const chosen = exportModal.querySelector('input[name="pdfOrientation"]:checked');
+        const orientation = chosen && chosen.value === 'portrait' ? 'portrait' : 'landscape';
+        try {
+            localStorage.setItem(ORIENTATION_KEY, orientation);
+        } catch {
+            // Remembering the choice is a convenience only.
+        }
+        closeModal(exportModal);
+        exportToPdf(fileName, orientation);
     });
 
     // ---------- Share (outgoing, via the OS share sheet) ----------
     shareBtn.addEventListener('click', () => {
         const markdownText = markdownEditor.value;
+        track('share');
 
         if (navigator.share) {
             navigator.share({
-                title: 'Markdown Content from SlideForge',
+                title: 'Markdown from SlideForge',
                 text: markdownText
             }).then(() => {
-                showNotification('Content shared successfully!');
+                showNotification('Shared.');
             }).catch((error) => {
                 if (error && error.name === 'AbortError') return; // user closed the sheet
                 console.error('Share failed:', error);
@@ -474,59 +958,22 @@ Enjoy creating your presentations!
             textarea.select();
             document.execCommand('copy');
             document.body.removeChild(textarea);
-            showNotification('Content copied to clipboard!');
+            showNotification('Markdown copied to your clipboard.');
         };
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(content)
-                .then(() => showNotification('Content copied to clipboard!'))
+                .then(() => showNotification('Markdown copied to your clipboard.'))
                 .catch(legacyCopy);
         } else {
             legacyCopy();
         }
     }
 
-    // ---------- Native print ----------
+    // ---------- Native print (print.css rules live in styles.css) ----------
     printNativeBtn.addEventListener('click', async () => {
         await flushRender();
-
-        const appContainer = document.querySelector('.app-container');
-        const sidebar = document.querySelector('.sidebar');
-        const header = document.querySelector('.header');
-
-        const originalStyles = {
-            sidebarDisplay: sidebar.style.display,
-            headerDisplay: header.style.display,
-            appMargin: appContainer.style.margin,
-            appBorderRadius: appContainer.style.borderRadius,
-            appBoxShadow: appContainer.style.boxShadow,
-            appHeight: appContainer.style.height
-        };
-
-        sidebar.style.display = 'none';
-        header.style.display = 'none';
-        appContainer.style.margin = '0';
-        appContainer.style.borderRadius = '0';
-        appContainer.style.boxShadow = 'none';
-        appContainer.style.height = 'auto';
-
-        editorPanel.style.display = 'none';
-        previewPanel.style.display = 'block';
-        previewPanel.style.flex = '1';
-        previewPanel.style.width = '100%';
-
         window.print();
-
-        setTimeout(() => {
-            sidebar.style.display = originalStyles.sidebarDisplay;
-            header.style.display = originalStyles.headerDisplay;
-            appContainer.style.margin = originalStyles.appMargin;
-            appContainer.style.borderRadius = originalStyles.appBorderRadius;
-            appContainer.style.boxShadow = originalStyles.appBoxShadow;
-            appContainer.style.height = originalStyles.appHeight;
-
-            updatePanelDisplay();
-        }, 1000);
     });
 
     // ---------- Import ----------
@@ -539,13 +986,14 @@ Enjoy creating your presentations!
         if (file) {
             const reader = new FileReader();
             reader.onload = (event) => {
-                markdownEditor.value = event.target.result;
-                renderMarkdown();
+                setEditorValue(event.target.result);
                 scheduleDraftSave();
-                showNotification('File imported successfully!');
+                hideBanner();
+                showNotification('File imported.');
+                track('import');
             };
             reader.onerror = () => {
-                showNotification('Error reading file.', true);
+                showNotification('Could not read that file.', true);
             };
             reader.readAsText(file);
         }
@@ -583,20 +1031,32 @@ Enjoy creating your presentations!
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>SlideForge Export</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f7fafc; margin: 0; padding: 40px; }
-  .slide { max-width: 800px; margin: 0 auto 20px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
-  .slide h1 { font-size: 2.5em; color: #2d3748; text-align: center; margin-bottom: 20px; }
-  .slide h2 { font-size: 2em; color: #4a5568; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin: 30px 0 15px; }
-  .slide h3 { font-size: 1.5em; color: #667eea; margin: 20px 0 10px; }
-  .slide p, .slide li { font-size: 1.1em; line-height: 1.6; color: #4a5568; margin-bottom: 15px; }
-  .slide pre { background: #edf2f7; padding: 15px; border-radius: 8px; overflow-x: auto; }
-  .slide table { width: 100%; border-collapse: collapse; }
-  .slide th, .slide td { border: 1px solid #e2e8f0; padding: 12px 15px; text-align: left; }
-  .slide th { background: #ebf4ff; }
-  .slide blockquote { border-left: 4px solid #4299e1; padding: 10px 20px; background: #ebf8ff; margin: 20px 0; font-style: italic; }
-  .slide-number { position: absolute; bottom: 15px; right: 20px; font-size: 0.9em; color: #a0aec0; }
+  body { margin: 0; padding: 40px 16px; background: #e4e8ee; color: #2b3647; font-family: "Source Serif 4", Georgia, "Times New Roman", serif; }
+  .slide { position: relative; max-width: 880px; margin: 0 auto 28px; padding: 6% 7% 7%; min-height: 380px; background: #fff; border-radius: 6px; box-shadow: 0 1px 2px rgba(18,26,38,.1), 0 18px 40px -18px rgba(18,26,38,.35); line-height: 1.55; }
+  .slide::before { content: ""; position: absolute; top: 0; left: 7%; width: 2.6em; height: 6px; border-radius: 0 0 3px 3px; background: #ffb000; }
+  .slide h1, .slide h2, .slide h3, .slide th { font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #121a26; }
+  .slide h1 { font-size: 2.2em; line-height: 1.08; letter-spacing: -0.025em; margin: 0 0 .5em; }
+  .slide h2 { font-size: 1.5em; line-height: 1.15; margin: 1.1em 0 .45em; }
+  .slide h3 { font-size: 1.1em; color: #2447d6; margin: 1em 0 .35em; }
+  .slide p, .slide li { font-size: 1.05em; }
+  .slide p { margin: 0 0 .8em; }
+  .slide ul, .slide ol { margin: 0 0 .9em; padding-left: 1.35em; }
+  .slide li { margin-bottom: .3em; }
+  .slide li::marker { color: #e39a00; }
+  .slide a { color: #2447d6; }
+  .slide blockquote { margin: 1em 0; padding: .1em 0 .1em 1em; border-left: 3px solid #ffb000; font-size: 1.12em; font-style: italic; color: #121a26; }
+  .slide code { padding: .1em .35em; border-radius: 4px; background: #f1f4f8; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .84em; color: #1d3aa8; }
+  .slide pre { margin: 0 0 1em; padding: .9em 1.1em; border: 1px solid #dde3ec; border-radius: 8px; background: #f1f4f8; overflow-x: auto; }
+  .slide pre code { padding: 0; background: none; color: #121a26; }
+  .slide table { width: 100%; margin: 0 0 1em; border-collapse: collapse; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: .95em; }
+  .slide th, .slide td { padding: .55em .8em; text-align: left; border-bottom: 1px solid #dde3ec; }
+  .slide th { font-weight: 650; border-bottom: 2px solid #121a26; }
+  .slide img { max-width: 100%; height: auto; }
+  .slide-number { position: absolute; right: 1.4em; bottom: 1em; font-family: system-ui, sans-serif; font-size: .78em; color: #5f6b7e; }
+  @media print { body { background: #fff; padding: 0; } .slide { box-shadow: none; border-radius: 0; margin: 0; max-width: none; page-break-after: always; } .slide::before, .slide-number { display: none; } }
 </style>
 </head>
 <body>
@@ -618,14 +1078,12 @@ ${slideMarkup}
     }
 
     saveBtn.addEventListener('click', () => {
-        saveModal.style.display = 'flex';
         saveFileNameInput.value = 'presentation';
-        saveFileNameInput.focus();
+        openModal(saveModal, saveFileNameInput);
+        saveFileNameInput.select();
     });
 
-    cancelSaveBtn.addEventListener('click', () => {
-        saveModal.style.display = 'none';
-    });
+    cancelSaveBtn.addEventListener('click', () => closeModal(saveModal));
 
     confirmSaveBtn.addEventListener('click', () => {
         const baseName = saveFileNameInput.value.trim() || 'presentation';
@@ -633,7 +1091,7 @@ ${slideMarkup}
         const markdownText = markdownEditor.value;
 
         if (!saveTypeInput) {
-            showNotification('Please choose a save format.', true);
+            showNotification('Choose a file format.', true);
             return;
         }
 
@@ -657,19 +1115,98 @@ ${slideMarkup}
                 mimeType = 'text/html';
                 break;
             default:
-                showNotification('Please choose a save format.', true);
+                showNotification('Choose a file format.', true);
                 return;
         }
 
         try {
             downloadFile(content, fileName, mimeType);
-            saveModal.style.display = 'none';
-            showNotification('File saved successfully!');
+            closeModal(saveModal);
+            showNotification(`Saved ${fileName}.`);
+            track(`save-${saveTypeInput.value}`);
         } catch (error) {
             console.error('Save failed:', error);
-            showNotification('Save failed. Please try again.', true);
+            showNotification('Could not save the file. Try again.', true);
         }
     });
+
+    // ---------- Feedback ----------
+    // Links are built when the dialog opens. They carry the app version and
+    // basic device facts so a report can be reproduced, and never the slides.
+    function deviceFacts() {
+        const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+        return {
+            version: CONFIG.version || '',
+            browser: navigator.userAgent,
+            screen: `${window.screen ? window.screen.width : '?'}x${window.screen ? window.screen.height : '?'}`,
+            installed: standalone ? 'yes' : 'no'
+        };
+    }
+
+    function issueUrl(template) {
+        const facts = deviceFacts();
+        const params = new URLSearchParams({
+            template,
+            version: facts.version,
+            environment: `${facts.browser} | screen ${facts.screen} | installed app: ${facts.installed}`
+        });
+        return `https://github.com/${CONFIG.repo}/issues/new?${params.toString()}`;
+    }
+
+    function openFeedback() {
+        feedbackBug.href = issueUrl('bug_report.yml');
+        feedbackIdea.href = issueUrl('feature_request.yml');
+
+        if (CONFIG.feedbackEmail) {
+            const facts = deviceFacts();
+            const body = [
+                'What happened, or what would you like?',
+                '',
+                '',
+                '--- Added automatically (no slide content) ---',
+                `Version: ${facts.version}`,
+                `Browser: ${facts.browser}`,
+                `Screen: ${facts.screen}`,
+                `Installed app: ${facts.installed}`
+            ].join('\n');
+            feedbackMail.href = `mailto:${CONFIG.feedbackEmail}?subject=${encodeURIComponent('SlideForge feedback')}&body=${encodeURIComponent(body)}`;
+            feedbackMail.hidden = false;
+        } else {
+            feedbackMail.hidden = true;
+        }
+
+        track('feedback');
+        openModal(feedbackModal, feedbackBug);
+    }
+
+    feedbackBtn.addEventListener('click', openFeedback);
+    closeFeedbackBtn.addEventListener('click', () => closeModal(feedbackModal));
+
+    // ---------- About ----------
+    function syncAnalyticsRow() {
+        if (!analytics || !analytics.configured()) {
+            analyticsRow.hidden = true;
+            return;
+        }
+        analyticsRow.hidden = false;
+        if (analytics.browserOptedOut()) {
+            analyticsToggle.checked = false;
+            analyticsToggle.disabled = true;
+            analyticsToggle.nextElementSibling.insertAdjacentText('beforeend', ' Off, because your browser sends Do Not Track.');
+        } else {
+            analyticsToggle.checked = !analytics.isOff();
+        }
+    }
+
+    if (appVersionEl && CONFIG.version) appVersionEl.textContent = CONFIG.version;
+    syncAnalyticsRow();
+    analyticsToggle.addEventListener('change', () => {
+        if (analytics) analytics.setEnabled(analyticsToggle.checked);
+        showNotification(analyticsToggle.checked ? 'Anonymous usage counts are on.' : 'Anonymous usage counts are off.');
+    });
+
+    aboutBtn.addEventListener('click', () => openModal(aboutModal, closeAboutBtn));
+    closeAboutBtn.addEventListener('click', () => closeModal(aboutModal));
 });
 
 // ---------- Service worker (installable + offline) ----------

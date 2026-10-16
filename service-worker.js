@@ -1,21 +1,28 @@
 // SlideForge service worker: installable PWA + offline use.
 // Bump CACHE_NAME whenever APP_SHELL files or CDN_ASSETS versions change.
-const CACHE_NAME = 'slideforge-v2';
+const CACHE_NAME = 'slideforge-v4';
 
 // '/index.html' is intentionally absent: with cleanUrls it redirects to '/',
 // and a cached redirect cannot be served for a page navigation.
-const APP_SHELL = ['/', '/styles.css', '/script.js', '/manifest.json'];
+const APP_SHELL = [
+    '/', '/styles.css', '/config.js', '/analytics.js', '/script.js', '/manifest.json',
+    '/fonts/bricolage-grotesque-latin-wght-normal.woff2',
+    '/fonts/source-serif-4-latin-wght-normal.woff2',
+    '/fonts/source-serif-4-latin-wght-italic.woff2',
+    '/fonts/jetbrains-mono-latin-400-normal.woff2'
+];
 
 // Must match index.html exactly. Versioned URLs never change, so cache-first.
+// Mermaid (3.5 MB) is deliberately NOT precached: it is only fetched when a
+// slide has a diagram, then kept by the cache-first CDN handler below, so
+// people who never use diagrams never pay for it.
 const CDN_ASSETS = [
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
     'https://cdn.jsdelivr.net/npm/dompurify@3.4.15/dist/purify.min.js',
     'https://cdn.jsdelivr.net/npm/marked@18.0.14/lib/marked.umd.js',
     'https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js',
-    'https://cdn.jsdelivr.net/npm/html2canvas-pro@2.4.4/dist/html2canvas-pro.min.js',
-    'https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js'
+    'https://cdn.jsdelivr.net/npm/html2canvas-pro@2.4.4/dist/html2canvas-pro.min.js'
 ];
-const CDN_HOSTS = ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com'];
+const CDN_HOSTS = ['cdn.jsdelivr.net'];
 
 self.addEventListener('install', (event) => {
     event.waitUntil((async () => {
@@ -57,7 +64,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Pinned CDN libraries and Font Awesome's font files: cache first.
+    // Pinned CDN libraries (including Mermaid on first use): cache first.
     if (CDN_HOSTS.includes(url.hostname)) {
         event.respondWith((async () => {
             const cached = await caches.match(request);
