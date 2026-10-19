@@ -1,6 +1,6 @@
 // SlideForge service worker: installable PWA + offline use.
 // Bump CACHE_NAME whenever APP_SHELL files or CDN_ASSETS versions change.
-const CACHE_NAME = 'slideforge-v4';
+const CACHE_NAME = 'slideforge-v5';
 
 // '/index.html' is intentionally absent: with cleanUrls it redirects to '/',
 // and a cached redirect cannot be served for a page navigation.
@@ -17,10 +17,10 @@ const APP_SHELL = [
 // slide has a diagram, then kept by the cache-first CDN handler below, so
 // people who never use diagrams never pay for it.
 const CDN_ASSETS = [
-    'https://cdn.jsdelivr.net/npm/dompurify@3.4.15/dist/purify.min.js',
-    'https://cdn.jsdelivr.net/npm/marked@18.0.14/lib/marked.umd.js',
+    'https://cdn.jsdelivr.net/npm/dompurify@3.4.17/dist/purify.min.js',
+    'https://cdn.jsdelivr.net/npm/marked@18.1.1/lib/marked.umd.js',
     'https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js',
-    'https://cdn.jsdelivr.net/npm/html2canvas-pro@2.4.4/dist/html2canvas-pro.min.js'
+    'https://cdn.jsdelivr.net/npm/html2canvas-pro@2.5.2/dist/html2canvas-pro.min.js'
 ];
 const CDN_HOSTS = ['cdn.jsdelivr.net'];
 

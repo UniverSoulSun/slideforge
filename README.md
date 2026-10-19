@@ -26,11 +26,11 @@ Vanilla HTML, CSS, and JavaScript — no framework, no bundler.
 
 | Purpose | Library | Version |
 |---|---|---|
-| Markdown parsing | [marked](https://marked.js.org) | 18.0.14 |
-| HTML sanitization | [DOMPurify](https://github.com/cure53/DOMPurify) | 3.4.15 |
+| Markdown parsing | [marked](https://marked.js.org) | 18.1.1 |
+| HTML sanitization | [DOMPurify](https://github.com/cure53/DOMPurify) | 3.4.17 |
 | Diagrams | [Mermaid](https://mermaid.js.org) | 11.17.2 |
 | PDF generation | [jsPDF](https://github.com/parallax/jsPDF) | 4.2.1 |
-| DOM-to-canvas rendering | [html2canvas-pro](https://github.com/yorickshan/html2canvas-pro) | 2.4.4 |
+| DOM-to-canvas rendering | [html2canvas-pro](https://github.com/yorickshan/html2canvas-pro) | 2.5.2 |
 
 All five load from jsDelivr at exact pinned versions — no `npm install` needed to run the app. The same versions are listed as `devDependencies` in `package.json` so GitHub can flag security advisories against them, and a weekly workflow keeps them current (see [MAINTAINING.md](MAINTAINING.md)).
 
