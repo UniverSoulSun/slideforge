@@ -33,11 +33,11 @@
     "url": "https://github.com/UniverSoulSun/slideforge/issues"
   },
   "devDependencies": {
-    "dompurify": "3.4.15",
-    "html2canvas-pro": "2.4.4",
+    "dompurify": "3.4.17",
+    "html2canvas-pro": "2.5.2",
     "jspdf": "4.2.1",
     "live-server": "1.2.2",
-    "marked": "18.0.14",
+    "marked": "18.1.2",
     "mermaid": "11.17.2",
     "playwright": "1.64.1",
     "serve": "14.2.6"
